@@ -24,6 +24,7 @@ from xml.dom import minidom
 from urllib import quote_plus
 import unicodedata
 import re
+from datetime import date
 
 BASE_URL = 'http://tvnz.co.nz'
 MIN_BITRATE = 400000
@@ -109,8 +110,24 @@ def EPISODE_LIST(id):
   getEpisodes(id, "%s/content/%s/ps3_xml_skin.xml" % (BASE_URL, id,))
 
 def getDuration(dur):
-  #TODO: convert duration to minutes...
-  return(dur)
+  # Durations are formatted like 0:43:15
+  minutes = 0
+  parts = dur.split(":")
+  if len(parts) == 3:
+    minutes = int(parts[0]) * 60 + int(parts[1])
+  return str(minutes)
+
+def getDate(str):
+  # Dates are formatted like 23 Jan 2010.
+  # Can't use datetime.strptime as that wasn't introduced until Python 2.6
+  months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+  str = str.encode('ascii', 'replace') # Part of the dates include the NO BREAK character \xA0 instead of a space
+  str = str.replace("?", " ")
+  parts = str.split(" ")
+  if len(parts) == 3:
+    d = date(int(parts[2]), months.index(parts[1]) + 1, int(parts[0]))
+    return d.strftime("%d.%m.%Y")
+  return ""
 
 def getShow(show):
   se = re.search('/content/(.*)_(episodes|extras)_group/ps3_xml_skin.xml', show.attributes["href"].value)
@@ -140,6 +157,7 @@ def getEpisode(ep,info_id):
     else:
       info["season"] = 0
       info["episode"] = 1
+    info["date"] = getDate(extra[1])
     info["aired"] = extra[1]
     info["duration"] = getDuration(extra[2])
   elif len(extra) == 2:
@@ -152,14 +170,12 @@ def getEpisode(ep,info_id):
   se = re.search('/([0-9]+)/', ep.attributes["href"].value)
   if se:
     link = se.group(1)
-    if not len(info["title"]):
-      if "aired" in info.keys():
-        label = "%s - %s" % (info["tvshowtitle"],info["aired"],)
-      else:
-        label = info["tvshowtitle"]
-      info["title"] = label
+    if len(info["title"]):
+      label = "%s - \"%s\"" % (info["tvshowtitle"],info["title"],)
+      print label
     else:
-      label = "%s - %s" % (info["tvshowtitle"],info["title"],)
+      label = info["tvshowtitle"]
+    info["title"] = label
     if ep.firstChild:
       info["plot"]=ep.firstChild.data
     url = "%s?type=video&id=%s" % (sys.argv[0],link)
@@ -284,7 +300,7 @@ if len(id) > 1:
     xbmcplugin.endOfDirectory(int(sys.argv[1]))
   elif type=="singleshow":
     SHOW_EPISODES(id)
-    xbmcplugin.addSortMethod( handle=int( sys.argv[ 1 ] ), sortMethod=xbmcplugin.SORT_METHOD_LABEL )
+    xbmcplugin.addSortMethod( handle=int( sys.argv[ 1 ] ), sortMethod=xbmcplugin.SORT_METHOD_DATE )
     xbmcplugin.setContent(handle=int( sys.argv[ 1 ] ), content="episodes")
     xbmcplugin.endOfDirectory(int(sys.argv[1]))
   elif type=="alphabetical":
