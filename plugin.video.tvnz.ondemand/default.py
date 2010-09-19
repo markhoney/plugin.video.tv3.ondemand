@@ -172,7 +172,6 @@ def getEpisode(ep,info_id):
     link = se.group(1)
     if len(info["title"]):
       label = "%s - \"%s\"" % (info["tvshowtitle"],info["title"],)
-      print label
     else:
       label = info["tvshowtitle"]
     info["title"] = label
