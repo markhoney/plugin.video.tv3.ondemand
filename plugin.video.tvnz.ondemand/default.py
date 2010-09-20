@@ -60,22 +60,6 @@ def SHOW_LIST(id):
       xbmcplugin.addDirectoryItem( handle=int(sys.argv[1]), url=url, listitem=liz, isFolder=True )
       urls.append(url)
 
-def GET_DETAILS(info_id,episode_id):
-  url = "%s/content/%s/ps3_xml_skin.xml" % (BASE_URL, info_id,)
-  req3 = urllib2.Request(url)
-  response = urllib2.urlopen(req3)
-  link = response.read()
-  response.close()
-  node = minidom.parseString(link).documentElement
-  for ep in node.getElementsByTagName('Episode'):
-    se = re.search('/([0-9]+)/', ep.attributes["href"].value)
-    if se and se.group(1)==id:
-      return getEpisode(ep,episode_id)
-  for ep in node.getElementsByTagName('Extra'):
-    se = re.search('/([0-9]+)/', ep.attributes["href"].value)
-    if se and se.group(1)==id:
-      return getEpisode(ep,episode_id)
-
 def SHOW_EPISODES(id):
   try:
     getEpisodes(id,"%s/content/%s/ps3_xml_skin.xml" % (BASE_URL, id,))
@@ -102,9 +86,9 @@ def getEpisodes(id,url):
   response.close()
   node = minidom.parseString(link).documentElement
   for ep in node.getElementsByTagName('Episode'):
-    addEpisode(ep,id)
+    addEpisode(ep)
   for ep in node.getElementsByTagName('Extra'):
-    addEpisode(ep,id)
+    addEpisode(ep)
 
 def EPISODE_LIST(id):
   getEpisodes(id, "%s/content/%s/ps3_xml_skin.xml" % (BASE_URL, id,))
@@ -144,7 +128,7 @@ def getShow(show):
     liz.setInfo( type='Video', infoLabels={ 'episode': videos, 'tvshowtitle': title, 'title': title } )
     return(url,liz)
 
-def getEpisode(ep,info_id):
+def getEpisode(ep):
   info = dict()
   info["tvshowtitle"] = ep.attributes["title"].value
   info["title"] = ep.attributes["sub-title"].value
@@ -178,15 +162,13 @@ def getEpisode(ep,info_id):
     if ep.firstChild:
       info["plot"]=ep.firstChild.data
     url = "%s?type=video&id=%s" % (sys.argv[0],link)
-    if len(info_id):
-      url = url + "&info=" + info_id
     liz = xbmcgui.ListItem(label, iconImage="DefaultVideo.png", thumbnailImage=thumb)
     liz.setInfo( type="Video", infoLabels=info )
     liz.setProperty("IsPlayable", "true")
     return(url,liz)
 
-def addEpisode(ep,id):
-  url,liz = getEpisode(ep,id)
+def addEpisode(ep):
+  url,liz = getEpisode(ep)
   xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=url,listitem=liz,isFolder=False)
 
 def getAdvert(chapter):
@@ -203,9 +185,7 @@ def getAdvert(chapter):
       if flv.firstChild and len(flv.firstChild.wholeText):
         return(flv.firstChild.wholeText)
 
-def RESOLVE(id,info):
-  # get information first
-  url,liz = GET_DETAILS(info,id)
+def RESOLVE(id):
   url = "%s/content/%s/ta_ent_smil_skin.smil?platform=PS3" % (BASE_URL,id,)
   req3 = urllib2.Request(url)
   response = urllib2.urlopen(req3)
@@ -238,7 +218,7 @@ def RESOLVE(id,info):
     uri = constructStackURL(urls)
   elif len(urls) == 1:
     uri = urls[0]
-  liz.setPath(uri)
+  liz=xbmcgui.ListItem(path=uri)
   return(xbmcplugin.setResolvedUrl(handle=int(sys.argv[1]), succeeded=True, listitem=liz))
 
 def constructStackURL(urls):
@@ -285,11 +265,6 @@ try:
 except:
   type = "";
   pass
-try:
-  info = params["info"]
-except:
-  info = "";
-  pass
 
 if len(id) > 1:
   if type=="shows":
@@ -313,7 +288,7 @@ if len(id) > 1:
     xbmcplugin.setContent(handle=int( sys.argv[ 1 ] ), content="tvshows")
     xbmcplugin.endOfDirectory(int(sys.argv[1]))
   elif type=="video":
-    RESOLVE(id,info)
+    RESOLVE(id)
 else:  
   INDEX()
   xbmcplugin.addSortMethod( handle=int( sys.argv[ 1 ] ), sortMethod=xbmcplugin.SORT_METHOD_LABEL )
