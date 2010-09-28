@@ -156,7 +156,7 @@ def constructStackURL(playlist):
    uri = "stack://" + url
  return(uri)
 
-def base(provider):
+def base_url(provider):
  return "%s.%s.%s" % (urls["BASE1"], provider, urls["BASE2"])
 
 def rtmp(provider):
@@ -213,7 +213,7 @@ def INDEX_FOLDER(folder):
   INDEX_SHOWS("tv3")
 
 def INDEX(provider):
- doc = gethtmlpage("%s/tabid/56/default.aspx" % (base(provider))) #Get our HTML page with a list of video categories
+ doc = gethtmlpage("%s/tabid/56/default.aspx" % (base_url(provider))) #Get our HTML page with a list of video categories
  if doc:
   a_tag = SoupStrainer('a')
   html_atag = BeautifulSoup(doc, parseOnlyThese = a_tag)
@@ -258,7 +258,7 @@ def INDEX_SHOWS(provider):
      info = defaultinfo(1)
      info["Title"] = link.string.strip()
      catid = link['href']
-     info["FileName"] = "%s?cat=%s&catid=%s" % (sys.argv[0], "shows", urllib.quote(catid))
+     info["FileName"] = "%s?cat=%s&title=%scatid=%s" % (sys.argv[0], "shows", urllib.quote(info["Title"]), urllib.quote(catid))
      info["Count"] = count
      count += 1
      addlistitem(info, 1)
@@ -270,14 +270,14 @@ def INDEX_SHOWS(provider):
   sys.stderr.write("Couldn't get index webpage")
 
 def SHOW_EPISODES(catid, provider):
- doc = gethtmlpage("%s%s%s" % (base("tv3"), urls["CAT"], catid))
+ doc = gethtmlpage("%s%s%s" % (base_url("tv3"), urls["CAT"], catid))
  if doc:
   a_tag=SoupStrainer('div')
   html_atag = BeautifulSoup(doc, parseOnlyThese = a_tag)
   programs = html_atag.findAll(attrs={"class": "latestArticle "})
   if len(programs) > 0:
    count = 0
-   baseurl = base(provider)
+   baseurl = base_url(provider)
    for soup in programs:
     info = defaultinfo()
     info["Studio"] = provider
@@ -292,7 +292,6 @@ def SHOW_EPISODES(catid, provider):
         info.update(imageinfo(soup.find("img", attrs={"src": re.compile(urls["IMG_RE"]), "title": True})))
         info.update(seasonepisode(soup.find("span", attrs={"class": "title"})))
         info.update(dateduration(soup.find("span", attrs={"class": "dateAdded"})))
-        info["FileName"] = "%s?id=%s&info=%s" % (sys.argv[0], "%s,%s,%s,%s" % (href.group(1), href.group(2), href.group(3), href.group(4)), urllib.quote(str(info)))
         info["Title"] = itemtitle(info["TVShowTitle"], info["PlotOutline"])
         info["Count"] = count
         count += 1
@@ -300,6 +299,7 @@ def SHOW_EPISODES(catid, provider):
         if plot:
          if plot.strip() <> "":
           info["Plot"] = unescape(plot.strip())
+        info["FileName"] = "%s?id=%s&info=%s" % (sys.argv[0], "%s,%s,%s,%s" % (href.group(1), href.group(2), href.group(3), href.group(4)), urllib.quote(str(info)))
         addlistitem(info, 0)
   else:
    sys.stderr.write("Couldn't find any videos")
@@ -308,13 +308,13 @@ def SHOW_EPISODES(catid, provider):
 
 
 def SHOW_ATOZ(catid, provider):
- doc = gethtmlpage("%s%s%s" % (base("tv3"), urls["CAT"], catid))
+ doc = gethtmlpage("%s%s%s" % (base_url("tv3"), urls["CAT"], catid))
  if doc:
   a_tag=SoupStrainer('div')
   html_atag = BeautifulSoup(doc, parseOnlyThese = a_tag)
   programs = html_atag.findAll(attrs={"class": "wideArticles"})
   if len(programs) > 0:
-   baseurl = base(provider)
+   baseurl = base_url(provider)
    count = 0
    for soup in programs:
     info = defaultinfo()
@@ -329,19 +329,22 @@ def SHOW_ATOZ(catid, provider):
         info["TVShowTitle"] = title
         info.update(imageinfo(soup.find("img", attrs={"src": re.compile(urls["IMG_RE"]), "title": True})))
         info.update(seasonepisode(soup.contents[4]))
-        info["FileName"] = "%s?id=%s&info=%s" % (sys.argv[0], "%s,%s,%s,%s" % (href.group(1), href.group(2), href.group(3), href.group(4)), urllib.quote(str(info)))
         info["Title"] = itemtitle(info["TVShowTitle"], info["PlotOutline"])
         info["Plot"] = unescape(soup.find("span", attrs={"class": "lite"}).string.strip())
         info["Count"] = count
         count += 1
+        info["FileName"] = "%s?id=%s&info=%s" % (sys.argv[0], "%s,%s,%s,%s" % (href.group(1), href.group(2), href.group(3), href.group(4)), urllib.quote(str(info)))
         addlistitem(info, 0)
   else:
    sys.stderr.write("Couldn't find any videos")
  else:
   sys.stderr.write("Couldn't get videos webpage")
 
-def SHOW_SHOW(catid, provider):
- doc = gethtmlpage("%s/%s" % (base(provider), catid))
+def SHOW_SHOW(catid, title, provider):
+ baseurl = ""
+ if catid[:4] <> "http":
+  baseurl = base_url(provider)
+ doc = gethtmlpage("%s%s" % (baseurl, catid))
  if doc:
   a_tag=SoupStrainer('div')
   html_atag = BeautifulSoup(doc, parseOnlyThese = a_tag)
@@ -351,19 +354,30 @@ def SHOW_SHOW(catid, provider):
    for soup in programs:
     info = defaultinfo()
     info["Studio"] = provider
-    link = soup.find("a", attrs={"href": re.compile(urls["FEEDBURNER"])})
+    link = soup.div.b.find("a", attrs={"href": re.compile(urls["FEEDBURNER"])})
+    if link:
+     urltype = "fb"
+    else:
+     link = soup.div.b.find("a", attrs={"href": re.compile(base_url("tv3"))})
+     if link:
+      urltype = "tv3"
     if link:
      if link.string:
-      title = link.string.strip()
-      if title <> "":
+      plot = link.string.strip()
+      if plot <> "":
+       info["PlotOutline"] = plot
        info["TVShowTitle"] = title
-       info.update(imageinfo(soup.find("img", attrs={"src": re.compile(urls["IMG_RE"]), "title": True})))
-       info.update(seasonepisode(soup.contents[4]))
-       info["FileName"] = "%s?id=%s&info=%s" % (sys.argv[0], "%s,%s,%s,%s" % (href.group(1), href.group(2), href.group(3), href.group(4)), urllib.quote(str(info)))
+       #info.update(imageinfo(soup.find("img", attrs={"src": re.compile(urls["IMG_RE"])})))
+       #info.update(seasonepisode(soup.contents[4]))
        info["Title"] = itemtitle(info["TVShowTitle"], info["PlotOutline"])
        info["Plot"] = unescape(soup.find("span", attrs={"class": "lite"}).string.strip())
        info["Count"] = count
        count += 1
+       if urltype == "fb":
+        info["FileName"] = "%s?showid=%s&info=%s" % (sys.argv[0], urllib.quote(link["href"]), urllib.quote(str(info)))
+       elif urltype == "tv3":
+        href = re.match("%s/(.*?)/%s/([0-9]+)/%s/([0-9]+)/%s/([0-9]+)/" % (baseurl, urls["VIDEO1"], urls["VIDEO2"], urls["VIDEO3"]), link['href'])
+        info["FileName"] = "%s?id=%s&info=%s" % (sys.argv[0], "%s,%s,%s,%s" % (href.group(1), href.group(2), href.group(3), href.group(4)), urllib.quote(str(info)))
        addlistitem(info, 0)
 
 def RESOLVE(id, info):
@@ -372,7 +386,7 @@ def RESOLVE(id, info):
  #var video ="/*transfer*07092010*HW026232";
  #var fo = new FlashObject("http://static.mediaworks.co.nz/video/3.1/videoPlayer3.1.swf?rnd="+random_num+"", "flashPlayerSwf", "640", "390", "10", "#000000");
  ids = id.split(",")
- doc = gethtmlpage("%s/%s/%s/%s/%s/%s/%s/%s/%s" % (base(info["Studio"]), ids[0], urls["VIDEO1"], ids[1], urls["VIDEO2"], ids[2], urls["VIDEO3"], ids[3], urls["VIDEO4"]))
+ doc = gethtmlpage("%s/%s/%s/%s/%s/%s/%s/%s/%s" % (base_url(info["Studio"]), ids[0], urls["VIDEO1"], ids[1], urls["VIDEO2"], ids[2], urls["VIDEO3"], ids[3], urls["VIDEO4"]))
  if doc:
   #videoid = re.search('var video ="/\*transfer\*([0-9]+)\*([0-9A-Z]+)";', doc)
   videoid = re.search('var video ="/\*(.*?)\*([0-9]+)\*(.*?)";', doc)
@@ -433,7 +447,7 @@ if params:
   elif params["cat"][0] == "c4tv":
    SHOW_EPISODES(params["catid"][0], "c4tv")
   elif params["cat"][0] == "shows":
-   SHOW_SHOW(urllib.unquote(params["catid"][0]), "tv3")
+   SHOW_SHOW(urllib.unquote(params["catid"][0]), urllib.unquote(params["title"][0]), "tv3")
   xbmcplugin.addSortMethod(handle = int(sys.argv[1]), sortMethod = xbmcplugin.SORT_METHOD_UNSORTED)
   #xbmcplugin.addSortMethod(handle = int(sys.argv[1]), sortMethod = xbmcplugin.SORT_METHOD_PROGRAM_COUNT)
   xbmcplugin.addSortMethod(handle = int(sys.argv[1]), sortMethod = xbmcplugin.SORT_METHOD_DATE)
