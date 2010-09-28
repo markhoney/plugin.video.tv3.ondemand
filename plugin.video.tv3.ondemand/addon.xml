@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<addon id="plugin.video.tv3.ondemand"
+       name="TV3 OnDemand"
+       version="1.0.0"
+       provider-name="Mark Honeychurch">
+  <requires>
+    <import addon="xbmc.python" version="1.0"/>
+  </requires>
+  <extension point="xbmc.python.pluginsource"
+            library="default.py">
+        <provides>video</provides>
+  </extension>
+  <extension point="xbmc.addon.metadata">
+    <platform>all</platform>
+    <summary lang="en">TV3 OnDemand</summary>
+    <description lang="en">New Zealand TV3 Videos.</description>
+  </extension>
+</addon>
