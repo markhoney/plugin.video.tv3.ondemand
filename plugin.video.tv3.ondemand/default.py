@@ -281,6 +281,117 @@ def INDEX_SHOWS(provider):
 
 
 
+def add_item_div(soup, provider, count):
+ baseurl = base_url(provider)
+ info = defaultinfo()
+ info["Studio"] = provider
+ link = soup.find("a", attrs={"href": re.compile(baseurl)})
+ if link:
+  href = re.match("%s/(.*?)/%s/([0-9]+)/%s/([0-9]+)/%s/([0-9]+)/" % (baseurl, urls["VIDEO1"], urls["VIDEO2"], urls["VIDEO3"]), link['href'])
+  if href:
+   if link.string:
+    title = link.string.strip()
+    if title <> "":
+     info["TVShowTitle"] = title
+     image = soup.find("img", attrs={"src": re.compile(urls["IMG_RE"]), "title": True})
+     if image:
+      info.update(imageinfo(image))
+     se = soup.find("span", attrs={"class": "title"})
+     if se:
+      info.update(seasonepisode(se))
+     date = soup.find("span", attrs={"class": "dateAdded"})
+     if date:
+      info.update(dateduration(date))
+     info["Title"] = itemtitle(info["TVShowTitle"], info["PlotOutline"])
+     info["Count"] = count
+     plot = soup.find("div", attrs={"class": "left"}).string
+     if plot:
+      if plot.strip() <> "":
+       info["Plot"] = unescape(plot.strip())
+     info["FileName"] = "%s?id=%s&info=%s" % (sys.argv[0], "%s,%s,%s,%s" % (href.group(1), href.group(2), href.group(3), href.group(4)), urllib.quote(str(info)))
+     addlistitem(info, 0)
+
+def add_item_show(soup, provider, count, title):
+ info = defaultinfo()
+ info["Studio"] = provider
+ bold = soup.find('b')
+ if bold:
+  link = bold.find("a", attrs={"href": re.compile(urls["FEEDBURNER_RE"])})
+  if link:
+   urltype = "other"
+  else:
+   link = bold.find("a", attrs={"href": re.compile(base_url("tv3"))})
+   if link:
+    urltype = "tv3"
+  if link:
+   if link.string:
+    plot = link.string.strip()
+    if plot <> "":
+     info["PlotOutline"] = plot
+     info["TVShowTitle"] = title
+     image = soup.find("img", attrs={"src": re.compile(urls["IMG_RE"])})
+     if image:
+      info.update(imageinfo(image))
+     info.update(seasonepisode(link))
+     info["Title"] = itemtitle(info["TVShowTitle"], info["PlotOutline"])
+     info["Count"] = count
+     if urltype == "tv3":
+      href = re.search("%s/(.*?)/%s/([0-9]+)/%s/([0-9]+)/%s/([0-9]+)/" % (base_url("tv3"), urls["VIDEO1"], urls["VIDEO2"], urls["VIDEO3"]), link['href'])
+      if href:
+       info["FileName"] = "%s?id=%s&info=%s" % (sys.argv[0], "%s,%s,%s,%s" % (href.group(1), href.group(2), href.group(3), href.group(4)), urllib.quote(str(info)))
+     elif urltype == "other":
+      info["FileName"] = "%s?id=%s&info=%s" % (sys.argv[0], urllib.quote(link["href"]), urllib.quote(str(info)))
+     addlistitem(info, 0)
+
+def add_item_table(soup, provider, count, title):
+ info = defaultinfo()
+ info["Studio"] = provider
+ link = soup.find('a')
+ if link:
+  if link.string:
+   plot = link.string.strip()
+   if plot <> "":
+    info["PlotOutline"] = plot
+    info["TVShowTitle"] = title
+    info.update(seasonepisode(link))
+    info["Title"] = itemtitle(info["TVShowTitle"], info["PlotOutline"])
+    info["Count"] = count
+    href = re.search("%s/(.*?)/%s/([0-9]+)/%s/([0-9]+)/%s/([0-9]+)/" % (base_url("tv3"), urls["VIDEO1"], urls["VIDEO2"], urls["VIDEO3"]), link['href'])
+    if href:
+     info["FileName"] = "%s?id=%s&info=%s" % (sys.argv[0], "%s,%s,%s,%s" % (href.group(1), href.group(2), href.group(3), href.group(4)), urllib.quote(str(info)))
+    addlistitem(info, 0)
+
+def add_item_atoz(soup, provider, count):
+ info = defaultinfo()
+ info["Studio"] = provider
+ link = soup.h5.find("a", attrs={"href": re.compile(baseurl)})
+ if link:
+  href = re.match("%s/(.*?)/%s/([0-9]+)/%s/([0-9]+)/%s/([0-9]+)/" % (baseurl, urls["VIDEO1"], urls["VIDEO2"], urls["VIDEO3"]), link['href'])
+  if href:
+   if link.string:
+    title = link.string.strip()
+    if title <> "":
+     info["TVShowTitle"] = title
+     info.update(imageinfo(soup.find("img", attrs={"src": re.compile(urls["IMG_RE"]), "title": True})))
+     info.update(seasonepisode(soup.contents[4]))
+     info["Title"] = itemtitle(info["TVShowTitle"], info["PlotOutline"])
+     info["Plot"] = unescape(soup.find("span", attrs={"class": "lite"}).string.strip())
+     info["Count"] = count
+     info["FileName"] = "%s?id=%s&info=%s" % (sys.argv[0], "%s,%s,%s,%s" % (href.group(1), href.group(2), href.group(3), href.group(4)), urllib.quote(str(info)))
+     addlistitem(info, 0)
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 def SHOW_EPISODES(catid, provider):
@@ -291,37 +402,13 @@ def SHOW_EPISODES(catid, provider):
   programs = html_atag.findAll(attrs={"class": "latestArticle "})
   if len(programs) > 0:
    count = 0
-   baseurl = base_url(provider)
    for soup in programs:
-    info = defaultinfo()
-    info["Studio"] = provider
-    link = soup.find("a", attrs={"href": re.compile(baseurl)})
-    if link:
-     href = re.match("%s/(.*?)/%s/([0-9]+)/%s/([0-9]+)/%s/([0-9]+)/" % (baseurl, urls["VIDEO1"], urls["VIDEO2"], urls["VIDEO3"]), link['href'])
-     if href:
-      if link.string:
-       title = link.string.strip()
-       if title <> "":
-        info["TVShowTitle"] = title
-        image = soup.find("img", attrs={"src": re.compile(urls["IMG_RE"]), "title": True})
-        if image:
-         info.update(imageinfo(image))
-        info.update(seasonepisode(soup.find("span", attrs={"class": "title"})))
-        info.update(dateduration(soup.find("span", attrs={"class": "dateAdded"})))
-        info["Title"] = itemtitle(info["TVShowTitle"], info["PlotOutline"])
-        info["Count"] = count
-        count += 1
-        plot = soup.find("div", attrs={"class": "left"}).string
-        if plot:
-         if plot.strip() <> "":
-          info["Plot"] = unescape(plot.strip())
-        info["FileName"] = "%s?id=%s&info=%s" % (sys.argv[0], "%s,%s,%s,%s" % (href.group(1), href.group(2), href.group(3), href.group(4)), urllib.quote(str(info)))
-        addlistitem(info, 0)
+    add_item_div(soup, provider, count)
+    count += 1
   else:
    sys.stderr.write("Couldn't find any videos")
  else:
   sys.stderr.write("Couldn't get videos webpage")
-
 
 def SHOW_ATOZ(catid, provider):
  doc = gethtmlpage("%s%s%s" % (base_url("tv3"), urls["CAT"], catid))
@@ -333,24 +420,8 @@ def SHOW_ATOZ(catid, provider):
    baseurl = base_url(provider)
    count = 0
    for soup in programs:
-    info = defaultinfo()
-    info["Studio"] = provider
-    link = soup.h5.find("a", attrs={"href": re.compile(baseurl)})
-    if link:
-     href = re.match("%s/(.*?)/%s/([0-9]+)/%s/([0-9]+)/%s/([0-9]+)/" % (baseurl, urls["VIDEO1"], urls["VIDEO2"], urls["VIDEO3"]), link['href'])
-     if href:
-      if link.string:
-       title = link.string.strip()
-       if title <> "":
-        info["TVShowTitle"] = title
-        info.update(imageinfo(soup.find("img", attrs={"src": re.compile(urls["IMG_RE"]), "title": True})))
-        info.update(seasonepisode(soup.contents[4]))
-        info["Title"] = itemtitle(info["TVShowTitle"], info["PlotOutline"])
-        info["Plot"] = unescape(soup.find("span", attrs={"class": "lite"}).string.strip())
-        info["Count"] = count
-        count += 1
-        info["FileName"] = "%s?id=%s&info=%s" % (sys.argv[0], "%s,%s,%s,%s" % (href.group(1), href.group(2), href.group(3), href.group(4)), urllib.quote(str(info)))
-        addlistitem(info, 0)
+    add_item_atoz(soup, provider, count)
+    count += 1
   else:
    sys.stderr.write("Couldn't find any videos")
  else:
@@ -371,37 +442,18 @@ def SHOW_SHOW(catid, title, provider):
    if len(programs) > 0:
     count = 0
     for soup in programs:
-     info = defaultinfo()
-     info["Studio"] = provider
-     bold = soup.find('b')
-     if bold:
-      link = bold.find("a", attrs={"href": re.compile(urls["FEEDBURNER_RE"])})
-      if link:
-       urltype = "other"
-      else:
-       link = bold.find("a", attrs={"href": re.compile(base_url("tv3"))})
-       if link:
-        urltype = "tv3"
-      if link:
-       if link.string:
-        plot = link.string.strip()
-        if plot <> "":
-         info["PlotOutline"] = plot
-         info["TVShowTitle"] = title
-         info.update(imageinfo(soup.find("img", attrs={"src": re.compile(urls["IMG_RE"])})))
-         info.update(seasonepisode(link))
-         info["Title"] = itemtitle(info["TVShowTitle"], info["PlotOutline"])
-         info["Count"] = count
-         count += 1
-         if urltype == "tv3":
-          href = re.search("%s/(.*?)/%s/([0-9]+)/%s/([0-9]+)/%s/([0-9]+)/" % (base_url("tv3"), urls["VIDEO1"], urls["VIDEO2"], urls["VIDEO3"]), link['href'])
-          if href:
-           info["FileName"] = "%s?id=%s&info=%s" % (sys.argv[0], "%s,%s,%s,%s" % (href.group(1), href.group(2), href.group(3), href.group(4)), urllib.quote(str(info)))
-         elif urltype == "other":
-          info["FileName"] = "%s?id=%s&info=%s" % (sys.argv[0], urllib.quote(link["href"]), urllib.quote(str(info)))
-         addlistitem(info, 0)
+     add_item_show(soup, provider, count, title)
+     count += 1
    else:
-    sys.stderr.write("Couldn't find any videos in list")
+    programs = tables.findAll('tr')
+    if len(programs) > 0:
+     count = -1
+     for soup in programs:
+      count += 1
+      if count > 0:
+       add_item_table(soup, provider, count, title)
+    else:
+     sys.stderr.write("Couldn't find any videos in list")
   else:
    sys.stderr.write("Couldn't find video list")
  else:
