@@ -20,6 +20,7 @@
 # *
 # */
 
+#http://ondemand.tv3.co.nz/Host/SQL/tabid/21/ctl/Login/portalid/0/Default.aspx
 
 import urllib, urllib2, htmllib, string, unicodedata, re, time, urlparse, cgi, xbmcgui, xbmcplugin, xbmcaddon
 from htmlentitydefs import name2codepoint
@@ -27,6 +28,7 @@ from xml.dom import minidom
 from BeautifulSoup import BeautifulSoup, SoupStrainer
 
 urls = dict()
+urls["TV3"] = 'http://www.tv3.co.nz'
 urls["BASE1"] = 'http://ondemand'
 urls["BASE2"] = 'co.nz'
 urls["RTMP1"] = 'rtmpe://nzcontent.mediaworks.co.nz'
@@ -35,7 +37,7 @@ urls["VIDEO1"] = 'tabid'
 urls["VIDEO2"] = 'articleID'
 urls["VIDEO3"] = 'MCat'
 urls["VIDEO4"] = 'Default.aspx'
-urls["FEEDBURNER"] = 'http://feedproxy.google.com/~r/'
+urls["FEEDBURNER_RE"] = '//feedproxy\.google\.com/'
 urls["CAT"] = '/default404.aspx?tabid='
 urls["CAT_RE"] = '/default404\.aspx\?tabid='
 urls["IMG_RE"] = '\.ondemand\.tv3\.co\.nz/Portals/0-Articles/'
@@ -64,29 +66,25 @@ def gethtmlpage(url):
 def unescape(s):
  return re.sub('&(%s);' % '|'.join(name2codepoint), lambda m: unichr(name2codepoint[m.group(1)]), s)
 
+def checkdict(info, items):
+ for item in items:
+  if info.get(item, "##unlikelyphrase##") == "##unlikelyphrase##":
+   sys.stderr.write("Dictionary missing item: %s" % (item))
+   return 0
+ return 1
+
 def addlistitem(info, folder = 0):
- liz = xbmcgui.ListItem(info["Title"], iconImage = info["Icon"], thumbnailImage = info["Thumb"])
- liz.setInfo(type = "Video", infoLabels = info)
- if not folder:
-  liz.setProperty("IsPlayable", "true")
- xbmcplugin.addDirectoryItem(handle = int(sys.argv[1]), url = info["FileName"], listitem = liz, isFolder = folder)
-
-def addlistfolder(info):
- liz = xbmcgui.ListItem(info["Title"], iconImage = "DefaultFolder.png", thumbnailImage = info["Thumb"])
- liz.setInfo(type = "Video", infoLabels = info)
- xbmcplugin.addDirectoryItem(handle = int(sys.argv[1]), url = info["FileName"], listitem = liz, isFolder = True)
-
-def addlistitemold(info):
- liz = xbmcgui.ListItem(info["Title"], iconImage="DefaultVideo.png", thumbnailImage = info["Thumb"])
- liz.setInfo(type = "Video", infoLabels = info)
- liz.setProperty("IsPlayable", "true")
- xbmcplugin.addDirectoryItem(handle = int(sys.argv[1]), url = info["FileName"], listitem = liz, isFolder = False)
+ if checkdict(info, ("Title", "Icon", "Thumb", "FileName")):
+  liz = xbmcgui.ListItem(info["Title"], iconImage = info["Icon"], thumbnailImage = info["Thumb"])
+  liz.setInfo(type = "Video", infoLabels = info)
+  if not folder:
+   liz.setProperty("IsPlayable", "true")
+  xbmcplugin.addDirectoryItem(handle = int(sys.argv[1]), url = info["FileName"], listitem = liz, isFolder = folder)
 
 def defaultinfo(folder = 0):
  info = dict()
  if folder:
   info["Icon"] = "DefaultFolder.png"
-  info["Thumb"] = ""
  else:
   info["Icon"] = "DefaultVideo.png"
   #info["VideoCodec"] = "flv"
@@ -97,8 +95,8 @@ def defaultinfo(folder = 0):
   #info["AudioCodec"] = "aac"
   #info["AudioChannels"] = "2"
   #info["AudioLanguage"] = "eng"
+ info["Thumb"] = ""
  return info
-
 
 def xbmcdate(inputdate):
  return time.strftime(xbmc.getRegion( "datelong" ).replace( "DDDD,", "" ).replace( "MMMM", "%B" ).replace( "D", "%d" ).replace( "YYYY", "%Y" ).strip(), time.strptime(inputdate,"%d/%m/%y"))
@@ -107,10 +105,10 @@ def seasonepisode(se):
  if se:
   info = dict()
   info["PlotOutline"] = se.string.strip()
-  season = re.search("Season ([0-9]+)", se.string)
+  season = re.search("(Cycle|Season) ([0-9]+)", se.string)
   seasonfound = 0
   if season:
-   info["Season"] = int(season.group(1))
+   info["Season"] = int(season.group(2))
    seasonfound = 1
   episode = re.search("Ep(|isode) ([0-9]+)", se.string)
   if episode:
@@ -174,14 +172,12 @@ def rtmp(provider):
 
 
 
-
-
 def INDEX_FOLDERS():
  folders = dict()
  folders["0"] = "Categories"
  folders["1"] = "Channels"
  folders["2"] = "Genres"
- #folders["3"] = "Shows"
+ folders["3"] = "Shows"
  for index in folders:
   info = defaultinfo(1)
   info["Title"] = folders[index]
@@ -202,6 +198,10 @@ def INDEX_FOLDER(folder):
  infopages["8"]  = ("67", "Genres", "tv3", "News/Current Affairs")
  infopages["9"]  = ("68", "Genres", "tv3", "Reality")
  infopages["10"] = ("82", "Genres", "tv3", "Sports")
+ infopages["11"] = ("80", "Categories", "tv3", "All")
+ #infopages["12"] = ("74", "RSS", "tv3", "RSS Feeds")
+ #infopages["13"] = ("81", "Categories", "tv3", "C4 Highlights")
+ #infopages["13"] = ("73", "Categories", "tv3", "All (Small)")
  for index in infopages:
   if infopages[index][1] == folder:
    info = defaultinfo(1)
@@ -258,7 +258,10 @@ def INDEX_SHOWS(provider):
      info = defaultinfo(1)
      info["Title"] = link.string.strip()
      catid = link['href']
-     info["FileName"] = "%s?cat=%s&title=%scatid=%s" % (sys.argv[0], "shows", urllib.quote(info["Title"]), urllib.quote(catid))
+     if info["Title"] == "60 Minutes": #The URL on the next line has more videos
+      info["FileName"] = "%s?cat=%s&title=%s&catid=%s" % (sys.argv[0], "shows", urllib.quote(info["Title"]), urllib.quote(catid)) #"http://ondemand.tv3.co.nz/Default.aspx?TabId=80&cat=22"
+     else:
+      info["FileName"] = "%s?cat=%s&title=%s&catid=%s" % (sys.argv[0], "shows", urllib.quote(info["Title"]), urllib.quote(catid))
      info["Count"] = count
      count += 1
      addlistitem(info, 1)
@@ -268,6 +271,17 @@ def INDEX_SHOWS(provider):
    sys.stderr.write("Couldn't find video list")
  else:
   sys.stderr.write("Couldn't get index webpage")
+
+
+
+
+
+
+
+
+
+
+
 
 def SHOW_EPISODES(catid, provider):
  doc = gethtmlpage("%s%s%s" % (base_url("tv3"), urls["CAT"], catid))
@@ -289,7 +303,9 @@ def SHOW_EPISODES(catid, provider):
        title = link.string.strip()
        if title <> "":
         info["TVShowTitle"] = title
-        info.update(imageinfo(soup.find("img", attrs={"src": re.compile(urls["IMG_RE"]), "title": True})))
+        image = soup.find("img", attrs={"src": re.compile(urls["IMG_RE"]), "title": True})
+        if image:
+         info.update(imageinfo(image))
         info.update(seasonepisode(soup.find("span", attrs={"class": "title"})))
         info.update(dateduration(soup.find("span", attrs={"class": "dateAdded"})))
         info["Title"] = itemtitle(info["TVShowTitle"], info["PlotOutline"])
@@ -343,42 +359,61 @@ def SHOW_ATOZ(catid, provider):
 def SHOW_SHOW(catid, title, provider):
  baseurl = ""
  if catid[:4] <> "http":
-  baseurl = base_url(provider)
- doc = gethtmlpage("%s%s" % (baseurl, catid))
+  baseurl = urls["TV3"]
+ geturl = "%s%s" % (baseurl, catid)
+ doc = gethtmlpage(geturl)
  if doc:
-  a_tag=SoupStrainer('div')
-  html_atag = BeautifulSoup(doc, parseOnlyThese = a_tag)
-  programs = html_atag.findAll(attrs={"class": "ArticleEntry"})
-  if len(programs) > 0:
-   count = 0
-   for soup in programs:
-    info = defaultinfo()
-    info["Studio"] = provider
-    link = soup.div.b.find("a", attrs={"href": re.compile(urls["FEEDBURNER"])})
-    if link:
-     urltype = "fb"
-    else:
-     link = soup.div.b.find("a", attrs={"href": re.compile(base_url("tv3"))})
-     if link:
-      urltype = "tv3"
-    if link:
-     if link.string:
-      plot = link.string.strip()
-      if plot <> "":
-       info["PlotOutline"] = plot
-       info["TVShowTitle"] = title
-       #info.update(imageinfo(soup.find("img", attrs={"src": re.compile(urls["IMG_RE"])})))
-       #info.update(seasonepisode(soup.contents[4]))
-       info["Title"] = itemtitle(info["TVShowTitle"], info["PlotOutline"])
-       info["Plot"] = unescape(soup.find("span", attrs={"class": "lite"}).string.strip())
-       info["Count"] = count
-       count += 1
-       if urltype == "fb":
-        info["FileName"] = "%s?showid=%s&info=%s" % (sys.argv[0], urllib.quote(link["href"]), urllib.quote(str(info)))
-       elif urltype == "tv3":
-        href = re.match("%s/(.*?)/%s/([0-9]+)/%s/([0-9]+)/%s/([0-9]+)/" % (baseurl, urls["VIDEO1"], urls["VIDEO2"], urls["VIDEO3"]), link['href'])
-        info["FileName"] = "%s?id=%s&info=%s" % (sys.argv[0], "%s,%s,%s,%s" % (href.group(1), href.group(2), href.group(3), href.group(4)), urllib.quote(str(info)))
-       addlistitem(info, 0)
+  div_tag=SoupStrainer('div')
+  html_divtag = BeautifulSoup(doc, parseOnlyThese = div_tag)
+  tables = html_divtag.find(attrs={"xmlns:msxsl": "urn:schemas-microsoft-com:xslt"})
+  if tables:
+   programs = tables.findAll('table')
+   if len(programs) > 0:
+    count = 0
+    for soup in programs:
+     info = defaultinfo()
+     info["Studio"] = provider
+     bold = soup.find('b')
+     if bold:
+      link = bold.find("a", attrs={"href": re.compile(urls["FEEDBURNER_RE"])})
+      if link:
+       urltype = "other"
+      else:
+       link = bold.find("a", attrs={"href": re.compile(base_url("tv3"))})
+       if link:
+        urltype = "tv3"
+      if link:
+       if link.string:
+        plot = link.string.strip()
+        if plot <> "":
+         info["PlotOutline"] = plot
+         info["TVShowTitle"] = title
+         info.update(imageinfo(soup.find("img", attrs={"src": re.compile(urls["IMG_RE"])})))
+         info.update(seasonepisode(link))
+         info["Title"] = itemtitle(info["TVShowTitle"], info["PlotOutline"])
+         info["Count"] = count
+         count += 1
+         if urltype == "tv3":
+          href = re.search("%s/(.*?)/%s/([0-9]+)/%s/([0-9]+)/%s/([0-9]+)/" % (base_url("tv3"), urls["VIDEO1"], urls["VIDEO2"], urls["VIDEO3"]), link['href'])
+          if href:
+           info["FileName"] = "%s?id=%s&info=%s" % (sys.argv[0], "%s,%s,%s,%s" % (href.group(1), href.group(2), href.group(3), href.group(4)), urllib.quote(str(info)))
+         elif urltype == "other":
+          info["FileName"] = "%s?id=%s&info=%s" % (sys.argv[0], urllib.quote(link["href"]), urllib.quote(str(info)))
+         addlistitem(info, 0)
+   else:
+    sys.stderr.write("Couldn't find any videos in list")
+  else:
+   sys.stderr.write("Couldn't find video list")
+ else:
+  sys.stderr.write("Couldn't get index webpage")
+
+
+
+
+
+
+
+
 
 def RESOLVE(id, info):
  #http://ondemand.tv3.co.nz/Season-7-Ep-10/tabid/59/articleID/1075/MCat/118/Default.aspx
@@ -386,7 +421,10 @@ def RESOLVE(id, info):
  #var video ="/*transfer*07092010*HW026232";
  #var fo = new FlashObject("http://static.mediaworks.co.nz/video/3.1/videoPlayer3.1.swf?rnd="+random_num+"", "flashPlayerSwf", "640", "390", "10", "#000000");
  ids = id.split(",")
- doc = gethtmlpage("%s/%s/%s/%s/%s/%s/%s/%s/%s" % (base_url(info["Studio"]), ids[0], urls["VIDEO1"], ids[1], urls["VIDEO2"], ids[2], urls["VIDEO3"], ids[3], urls["VIDEO4"]))
+ if len(ids) == 4:
+  doc = gethtmlpage("%s/%s/%s/%s/%s/%s/%s/%s/%s" % (base_url(info["Studio"]), ids[0], urls["VIDEO1"], ids[1], urls["VIDEO2"], ids[2], urls["VIDEO3"], ids[3], urls["VIDEO4"]))
+ else:
+  doc = gethtmlpage("id")
  if doc:
   #videoid = re.search('var video ="/\*transfer\*([0-9]+)\*([0-9A-Z]+)";', doc)
   videoid = re.search('var video ="/\*(.*?)\*([0-9]+)\*(.*?)";', doc)
