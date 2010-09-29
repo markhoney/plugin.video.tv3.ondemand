@@ -362,6 +362,7 @@ def add_item_table(soup, provider, count, title):
     addlistitem(info, 0)
 
 def add_item_atoz(soup, provider, count):
+ baseurl = base_url(provider)
  info = defaultinfo()
  info["Studio"] = provider
  link = soup.h5.find("a", attrs={"href": re.compile(baseurl)})
@@ -417,7 +418,6 @@ def SHOW_ATOZ(catid, provider):
   html_atag = BeautifulSoup(doc, parseOnlyThese = a_tag)
   programs = html_atag.findAll(attrs={"class": "wideArticles"})
   if len(programs) > 0:
-   baseurl = base_url(provider)
    count = 0
    for soup in programs:
     add_item_atoz(soup, provider, count)
