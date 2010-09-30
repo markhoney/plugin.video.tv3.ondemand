@@ -1,3 +1,6 @@
+[B]1.2.2[/B]
+- Added localization, thanks to Spiff
+
 [B]1.2.1[/B]
 - Fixed listing of Shows with a table-based episode layout
 
