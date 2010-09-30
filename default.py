@@ -70,6 +70,7 @@ urls["CAT_RE"] = '/default404\.aspx\?tabid='
 urls["IMG_RE"] = '\.ondemand\.tv3\.co\.nz/Portals/0-Articles/'
 
 __addon__ = xbmcaddon.Addon(id='plugin.video.tv3.ondemand')
+localize  = __addon__.getLocalizedString
 
 
 
@@ -233,10 +234,10 @@ def addlistitem(info, folder = 0): #Add a list item (media file or folder) to th
 
 def INDEX_FOLDERS(): #Create a list of top level folders for the hierarchy view
  folders = dict()
- folders["0"] = "Categories"
- folders["1"] = "Channels"
- folders["2"] = "Genres"
- folders["3"] = "Shows"
+ folders["0"] = localize(30002) # "Categories"
+ folders["1"] = localize(30003) # "Channels"
+ folders["2"] = localize(30004) # "Genres"
+ folders["3"] = localize(30005) # "Shows"
  for index in folders:
   info = defaultinfo(1)
   info["Title"] = folders[index]
@@ -246,18 +247,18 @@ def INDEX_FOLDERS(): #Create a list of top level folders for the hierarchy view
 
 def INDEX_FOLDER(folder): #Create second level folder for the hierarchy view, only showing items for the selected top level folder
  infopages = dict()
- infopages["0"]  = ("63", "Categories", "tv3", "Latest")
- infopages["1"]  = ("61", "Categories", "tv3", "Most Watched")
- infopages["2"]  = ("64", "Categories", "tv3", "Expiring Soon")
- infopages["3"]  = ("70", "Categories", "atoz", "A - Z")
- infopages["4"]  = ("71", "Channels", "tv3", "TV3")
- infopages["5"]  = ("72", "Channels", "c4tv", "C4")
- infopages["6"]  = ("65", "Genres", "tv3", "Comedy")
- infopages["7"]  = ("66", "Genres", "tv3", "Drama")
- infopages["8"]  = ("67", "Genres", "tv3", "News/Current Affairs")
- infopages["9"]  = ("68", "Genres", "tv3", "Reality")
- infopages["10"] = ("82", "Genres", "tv3", "Sports")
- infopages["11"] = ("80", "Categories", "tv3", "All")
+ infopages["0"]  = ("63", localize(30002), "tv3", localize(30006)) # Latest
+ infopages["1"]  = ("61", localize(30002), "tv3", localize(30007)) # Most Watched
+ infopages["2"]  = ("64", localize(30002), "tv3", localize(30008)) # Expiring soon
+ infopages["3"]  = ("70", localize(30002), "atoz", "A - Z")
+ infopages["4"]  = ("71", localize(30003), "tv3", "TV3")
+ infopages["5"]  = ("72", localize(30003), "c4tv", "C4")
+ infopages["6"]  = ("65", localize(30004), "tv3", localize(30009)) # Comedy
+ infopages["7"]  = ("66", localize(30004), "tv3", localize(30010)) # Drama
+ infopages["8"]  = ("67", localize(30004), "tv3", localize(30011)) # News/Current affairs
+ infopages["9"]  = ("68", localize(30004), "tv3", localize(30012)) # Reality
+ infopages["10"] = ("82", localize(30004), "tv3", localize(30013)) # Sports
+ infopages["11"] = ("80", localize(30002), "tv3", localize(30014)) # All
  #infopages["12"] = ("74", "RSS", "tv3", "RSS Feeds")
  #infopages["13"] = ("81", "Categories", "tv3", "C4 Highlights")
  #infopages["13"] = ("73", "Categories", "tv3", "All (Small)")
