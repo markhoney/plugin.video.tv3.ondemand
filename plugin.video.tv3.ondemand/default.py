@@ -20,12 +20,39 @@
 # *
 # */
 
-#http://ondemand.tv3.co.nz/Host/SQL/tabid/21/ctl/Login/portalid/0/Default.aspx
+#ToDo:
+# Fix sorting methods (they don't all seem to work properly)
+# Scan HTML data for broadcast dates (in AtoZ, table view, etc)
+# Find somewhere to add expiry dates?
+# Add an option to show an advert before the program (I can't find the URLs for adverts at the moment)
+
+#Useful list of categories
+# http://ondemand.tv3.co.nz/Host/SQL/tabid/21/ctl/Login/portalid/0/Default.aspx
+
+#XBMC Forum Thread
+# http://forum.xbmc.org/showthread.php?t=37014
+
+
+
+
+
+
+# Import external libraries
 
 import urllib, urllib2, htmllib, string, unicodedata, re, time, urlparse, cgi, xbmcgui, xbmcplugin, xbmcaddon
 from htmlentitydefs import name2codepoint
 from xml.dom import minidom
 from BeautifulSoup import BeautifulSoup, SoupStrainer
+
+
+
+
+
+
+
+
+
+# Setup a dictionary of useful URLs
 
 urls = dict()
 urls["TV3"] = 'http://www.tv3.co.nz'
@@ -41,21 +68,30 @@ urls["FEEDBURNER_RE"] = '//feedproxy\.google\.com/'
 urls["CAT"] = '/default404.aspx?tabid='
 urls["CAT_RE"] = '/default404\.aspx\?tabid='
 urls["IMG_RE"] = '\.ondemand\.tv3\.co\.nz/Portals/0-Articles/'
-MIN_BITRATE = 400000
+
 __addon__ = xbmcaddon.Addon(id='plugin.video.tv3.ondemand')
 
 
-def message(message):
+
+
+
+
+
+
+
+# Generic functions
+
+def message(message, title = "Warning"): #Show an on-screen message (useful for debugging)
  dialog = xbmcgui.Dialog()
  if message:
   if message <> "":
-   dialog.ok("Warning", message)
+   dialog.ok(title, message)
   else:
-   dialog.ok("Warning", "Empty message text")
+   dialog.ok("Message", "Empty message text")
  else:
-  dialog.ok("Warning", "No message text")
+  dialog.ok("Message", "No message text")
 
-def gethtmlpage(url):
+def gethtmlpage(url): #Grab an HTML page
  sys.stderr.write("Requesting page: %s" % (url))
  req = urllib2.Request(url)
  response = urllib2.urlopen(req)
@@ -63,25 +99,24 @@ def gethtmlpage(url):
  response.close()
  return doc
 
-def unescape(s):
+def unescape(s): #Convert escaped HTML characters back to native unicode, e.g. &gt; to > and &quot; to "
  return re.sub('&(%s);' % '|'.join(name2codepoint), lambda m: unichr(name2codepoint[m.group(1)]), s)
 
-def checkdict(info, items):
+def checkdict(info, items): #Check that all of the list "items" are in the dictionary "info"
  for item in items:
   if info.get(item, "##unlikelyphrase##") == "##unlikelyphrase##":
    sys.stderr.write("Dictionary missing item: %s" % (item))
    return 0
  return 1
 
-def addlistitem(info, folder = 0):
- if checkdict(info, ("Title", "Icon", "Thumb", "FileName")):
-  liz = xbmcgui.ListItem(info["Title"], iconImage = info["Icon"], thumbnailImage = info["Thumb"])
-  liz.setInfo(type = "Video", infoLabels = info)
-  if not folder:
-   liz.setProperty("IsPlayable", "true")
-  xbmcplugin.addDirectoryItem(handle = int(sys.argv[1]), url = info["FileName"], listitem = liz, isFolder = folder)
 
-def defaultinfo(folder = 0):
+
+
+
+
+# Metadata
+
+def defaultinfo(folder = 0): #Set the default info for folders (1) and videos (0). Most options have been hashed out as they don't show up in the list and are grabbed from the media by the player
  info = dict()
  if folder:
   info["Icon"] = "DefaultFolder.png"
@@ -98,10 +133,10 @@ def defaultinfo(folder = 0):
  info["Thumb"] = ""
  return info
 
-def xbmcdate(inputdate):
+def xbmcdate(inputdate): #Convert a date in "%d/%m/%y" format to an XBMC friendly format
  return time.strftime(xbmc.getRegion( "datelong" ).replace( "DDDD,", "" ).replace( "MMMM", "%B" ).replace( "D", "%d" ).replace( "YYYY", "%Y" ).strip(), time.strptime(inputdate,"%d/%m/%y"))
 
-def seasonepisode(se):
+def seasonepisode(se): #Search a tag for season and episode numbers. If there's an episode and no season, assume that it's season 1
  if se:
   info = dict()
   info["PlotOutline"] = se.string.strip()
@@ -117,7 +152,7 @@ def seasonepisode(se):
     info["Season"] = 1
   return info
 
-def dateduration(ad):
+def dateduration(ad): #Search a tag for aired date and video duration
  if ad:
   info = dict()
   aired = re.search("([0-9]{2}/[0-9]{2}/[0-9]{2})", ad.contents[1])
@@ -132,19 +167,28 @@ def dateduration(ad):
    info["Duration"] = time.strftime("%M", time.strptime(duration.group(1), "%M:%S"))
   return info
 
-def imageinfo(image):
+def imageinfo(image): #Search an image for its HREF
  if image:
   info = dict()
   info["Thumb"] = image['src']
   #alttitle = image['title']
   return info
 
-def itemtitle(Title, PlotOutline):
+def itemtitle(Title, PlotOutline): #Build a nice title from the program title and sub-title (given as PlotOutline)
  if PlotOutline:
   Title = "%s - %s" % (Title, PlotOutline)
  return Title
 
-def constructStackURL(playlist):
+
+
+
+
+
+
+
+# URL manipulation 
+
+def constructStackURL(playlist): #Build a URL stack from multiple URLs for the XBMC player
  uri = ""
  for url in playlist:
   url.replace(',',',,')
@@ -154,10 +198,10 @@ def constructStackURL(playlist):
    uri = "stack://" + url
  return(uri)
 
-def base_url(provider):
+def base_url(provider): #Build a base website URL for a given site (c4tv or tv3)
  return "%s.%s.%s" % (urls["BASE1"], provider, urls["BASE2"])
 
-def rtmp(provider):
+def rtmp(provider): #Build an RTMP URL for a given site (c4tv or tv3)
  if provider == "c4tv":
   return "%s/%s/%s" % (urls["RTMP1"], "c4", urls["RTMP2"])
  else:
@@ -168,11 +212,26 @@ def rtmp(provider):
 
 
 
+# XBMC Manipulation
+
+def addlistitem(info, folder = 0): #Add a list item (media file or folder) to the XBMC page
+ if checkdict(info, ("Title", "Icon", "Thumb", "FileName")):
+  liz = xbmcgui.ListItem(info["Title"], iconImage = info["Icon"], thumbnailImage = info["Thumb"])
+  liz.setInfo(type = "Video", infoLabels = info)
+  if not folder:
+   liz.setProperty("IsPlayable", "true")
+  xbmcplugin.addDirectoryItem(handle = int(sys.argv[1]), url = info["FileName"], listitem = liz, isFolder = folder)
 
 
 
 
-def INDEX_FOLDERS():
+
+
+
+
+#Create pages of folders (for categories, etc)
+
+def INDEX_FOLDERS(): #Create a list of top level folders for the hierarchy view
  folders = dict()
  folders["0"] = "Categories"
  folders["1"] = "Channels"
@@ -185,7 +244,7 @@ def INDEX_FOLDERS():
   info["FileName"] = "%s?folder=%s" % (sys.argv[0], folders[index])
   addlistitem(info, 1)
 
-def INDEX_FOLDER(folder):
+def INDEX_FOLDER(folder): #Create second level folder for the hierarchy view, only showing items for the selected top level folder
  infopages = dict()
  infopages["0"]  = ("63", "Categories", "tv3", "Latest")
  infopages["1"]  = ("61", "Categories", "tv3", "Most Watched")
@@ -212,7 +271,7 @@ def INDEX_FOLDER(folder):
  if folder == "Shows":
   INDEX_SHOWS("tv3")
 
-def INDEX(provider):
+def INDEX(provider): #Create a list of top level folders as scraped from TV3's website
  doc = gethtmlpage("%s/tabid/56/default.aspx" % (base_url(provider))) #Get our HTML page with a list of video categories
  if doc:
   a_tag = SoupStrainer('a')
@@ -243,11 +302,9 @@ def INDEX(provider):
  else:
   sys.stderr.write("Couldn't get index webpage")
 
-def INDEX_SHOWS(provider):
+def INDEX_SHOWS(provider): #Create a second level list of TV Shows from a TV3 webpage
  doc = gethtmlpage("%s/Shows/tabid/64/Default.aspx" % ("http://www.tv3.co.nz")) #Get our HTML page with a list of video categories
  if doc:
-  #div_tag = SoupStrainer('div')
-  #html_divtag = BeautifulSoup(doc, parseOnlyThese = div_tag)
   html_divtag = BeautifulSoup(doc)
   linksdiv = html_divtag.find('div', attrs = {"id": "pw_8171"})
   if linksdiv:
@@ -279,9 +336,9 @@ def INDEX_SHOWS(provider):
 
 
 
+# HTML Scrapers for different page styles
 
-
-def add_item_div(soup, provider, count):
+def add_item_div(soup, provider, count): #Scrape items from a div-style HTML page
  baseurl = base_url(provider)
  info = defaultinfo()
  info["Studio"] = provider
@@ -311,7 +368,7 @@ def add_item_div(soup, provider, count):
      info["FileName"] = "%s?id=%s&info=%s" % (sys.argv[0], "%s,%s,%s,%s" % (href.group(1), href.group(2), href.group(3), href.group(4)), urllib.quote(str(info)))
      addlistitem(info, 0)
 
-def add_item_show(soup, provider, count, title):
+def add_item_show(soup, provider, count, title): #Scrape items from a show-style HTML page
  info = defaultinfo()
  info["Studio"] = provider
  bold = soup.find('b')
@@ -343,7 +400,7 @@ def add_item_show(soup, provider, count, title):
       info["FileName"] = "%s?id=%s&info=%s" % (sys.argv[0], urllib.quote(link["href"]), urllib.quote(str(info)))
      addlistitem(info, 0)
 
-def add_item_table(soup, provider, count, title):
+def add_item_table(soup, provider, count, title): #Scrape items from a table-style HTML page
  info = defaultinfo()
  info["Studio"] = provider
  link = soup.find('a')
@@ -361,7 +418,7 @@ def add_item_table(soup, provider, count, title):
      info["FileName"] = "%s?id=%s&info=%s" % (sys.argv[0], "%s,%s,%s,%s" % (href.group(1), href.group(2), href.group(3), href.group(4)), urllib.quote(str(info)))
     addlistitem(info, 0)
 
-def add_item_atoz(soup, provider, count):
+def add_item_atoz(soup, provider, count): #Scrape items from an AtoZ-style HTML page
  baseurl = base_url(provider)
  info = defaultinfo()
  info["Studio"] = provider
@@ -393,9 +450,9 @@ def add_item_atoz(soup, provider, count):
 
 
 
+# Create pages listing Episodes that can be played
 
-
-def SHOW_EPISODES(catid, provider):
+def SHOW_EPISODES(catid, provider): #Show video items from a normal TV3 webpage
  doc = gethtmlpage("%s%s%s" % (base_url("tv3"), urls["CAT"], catid))
  if doc:
   a_tag=SoupStrainer('div')
@@ -411,23 +468,7 @@ def SHOW_EPISODES(catid, provider):
  else:
   sys.stderr.write("Couldn't get videos webpage")
 
-def SHOW_ATOZ(catid, provider):
- doc = gethtmlpage("%s%s%s" % (base_url("tv3"), urls["CAT"], catid))
- if doc:
-  a_tag=SoupStrainer('div')
-  html_atag = BeautifulSoup(doc, parseOnlyThese = a_tag)
-  programs = html_atag.findAll(attrs={"class": "wideArticles"})
-  if len(programs) > 0:
-   count = 0
-   for soup in programs:
-    add_item_atoz(soup, provider, count)
-    count += 1
-  else:
-   sys.stderr.write("Couldn't find any videos")
- else:
-  sys.stderr.write("Couldn't get videos webpage")
-
-def SHOW_SHOW(catid, title, provider):
+def SHOW_SHOW(catid, title, provider): #Show video items from a TV Show style TV3 webpage
  baseurl = ""
  if catid[:4] <> "http":
   baseurl = urls["TV3"]
@@ -459,6 +500,21 @@ def SHOW_SHOW(catid, title, provider):
  else:
   sys.stderr.write("Couldn't get index webpage")
 
+def SHOW_ATOZ(catid, provider): #Show video items from an AtoZ style TV3 webpage
+ doc = gethtmlpage("%s%s%s" % (base_url("tv3"), urls["CAT"], catid))
+ if doc:
+  a_tag=SoupStrainer('div')
+  html_atag = BeautifulSoup(doc, parseOnlyThese = a_tag)
+  programs = html_atag.findAll(attrs={"class": "wideArticles"})
+  if len(programs) > 0:
+   count = 0
+   for soup in programs:
+    add_item_atoz(soup, provider, count)
+    count += 1
+  else:
+   sys.stderr.write("Couldn't find any videos")
+ else:
+  sys.stderr.write("Couldn't get videos webpage")
 
 
 
@@ -466,12 +522,9 @@ def SHOW_SHOW(catid, title, provider):
 
 
 
+# Play a given media file grabbed from a URL
 
-def RESOLVE(id, info):
- #http://ondemand.tv3.co.nz/Season-7-Ep-10/tabid/59/articleID/1075/MCat/118/Default.aspx
- #http://ondemand.tv3.co.nz/tabid/59/articleID/1075/118
- #var video ="/*transfer*07092010*HW026232";
- #var fo = new FlashObject("http://static.mediaworks.co.nz/video/3.1/videoPlayer3.1.swf?rnd="+random_num+"", "flashPlayerSwf", "640", "390", "10", "#000000");
+def RESOLVE(id, info): #Scrape a page for a given OnDemand video and build an RTMP URL from the info in the page, then play the URL
  ids = id.split(",")
  if len(ids) == 4:
   doc = gethtmlpage("%s/%s/%s/%s/%s/%s/%s/%s/%s" % (base_url(info["Studio"]), ids[0], urls["VIDEO1"], ids[1], urls["VIDEO2"], ids[2], urls["VIDEO3"], ids[3], urls["VIDEO4"]))
@@ -517,7 +570,7 @@ def RESOLVE(id, info):
 
 
 
-
+# Decide what to run based on the plugin URL
 
 params = cgi.parse_qs(urlparse.urlparse(sys.argv[2])[4])
 if params:

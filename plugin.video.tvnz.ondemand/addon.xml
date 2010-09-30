@@ -7,12 +7,13 @@
     <import addon="xbmc.python" version="1.0"/>
   </requires>
   <extension point="xbmc.python.pluginsource"
-            library="default.py">
+             library="default.py">
         <provides>video</provides>
   </extension>
   <extension point="xbmc.addon.metadata">
     <platform>all</platform>
     <summary lang="en">TVNZ OnDemand</summary>
-    <description lang="en">Probably only works if your in NZ</description>
+    <description lang="en">Watch TVNZ OnDemand programs. Probably only works if you're in NZ.</description>
+    <disclaimer lang="en">Some parts of this addon may not be legal in your country of residence - please check with your local laws.</disclaimer>
   </extension>
 </addon>
